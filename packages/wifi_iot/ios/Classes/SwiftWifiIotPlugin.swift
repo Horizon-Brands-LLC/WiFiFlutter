@@ -285,16 +285,30 @@ public class SwiftWifiIotPlugin: NSObject, FlutterPlugin {
         result(String(cString: hostname))
     }
     
-    private func getNetworkInterface(family: Int32) -> ifaddrs? {
+ private func getNetworkInterface(family: Int32) -> ifaddrs? {
         var ifaddr : UnsafeMutablePointer<ifaddrs>?
         guard getifaddrs(&ifaddr) == 0 else { return nil }
         guard let firstAddr = ifaddr else { return nil }
-
+        
         for ifptr in sequence(first: firstAddr, next: { $0.pointee.ifa_next }) {
-            if ifptr.pointee.ifa_addr.pointee.sa_family == UInt8(family) {
-                if String(cString: ifptr.pointee.ifa_name) == "en0" {
-                    freeifaddrs(ifaddr)
-                    return ifptr.pointee
+            if ifptr.pointee.ifa_addr.pointee.sa_family == UInt8(family) || ifptr.pointee.ifa_addr.pointee.sa_family == UInt8(AF_INET6) {
+                if String(cString: ifptr.pointee.ifa_name) == "en0" || String(cString: ifptr.pointee.ifa_name) == "en2" {
+                    var hostname = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+                    getnameinfo(ifptr.pointee.ifa_addr,
+                                socklen_t(ifptr.pointee.ifa_addr.pointee.sa_len),
+                                &hostname,
+                                socklen_t(hostname.count),
+                                nil,
+                                socklen_t(0),
+                                NI_NUMERICHOST)
+                    
+                    let address =  String(cString: hostname)
+                    
+                    if address.contains("192.168.1") {
+                        print("getIPAddress -> , address: \(address) ...break")
+                        freeifaddrs(ifaddr)
+                        return ifptr.pointee
+                    }
                 }
             }
         }
